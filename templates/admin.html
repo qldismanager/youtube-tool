@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Tube - 관리자 센터</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #050b1a;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.25) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.2) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+        .cosmic-glass {
+            background: rgba(13, 23, 49, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen">
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- 상단 헤더 -->
+        <div class="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold flex items-center gap-2 text-cyan-400">
+                    <i class="fa-solid fa-shield-halved"></i> Cosmic Tube 관리자 센터
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">회원 목록을 모니터링하고 이용 권한을 통제합니다.</p>
+            </div>
+            <a href="/" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left"></i> 메인 서비스로 복귀
+            </a>
+        </div>
+
+        <!-- 회원 통계 카드 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="cosmic-glass p-5 rounded-2xl border border-cyan-500/20">
+                <p class="text-xs text-slate-400 mb-1">총 등록 회원수</p>
+                <h3 id="stat-total" class="text-2xl font-black text-cyan-300">- 명</h3>
+            </div>
+            <div class="cosmic-glass p-5 rounded-2xl border border-emerald-500/20">
+                <p class="text-xs text-slate-400 mb-1">정상 이용 회원</p>
+                <h3 id="stat-active" class="text-2xl font-black text-emerald-400">- 명</h3>
+            </div>
+            <div class="cosmic-glass p-5 rounded-2xl border border-rose-500/20">
+                <p class="text-xs text-slate-400 mb-1">이용 제한 회원</p>
+                <h3 id="stat-banned" class="text-2xl font-black text-rose-400">- 명</h3>
+            </div>
+        </div>
+
+        <!-- 회원 목록 테이블 카드 -->
+        <div class="cosmic-glass rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
+            <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+                <h2 class="font-bold text-base text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-users"></i> 가입 회원 명단
+                </h2>
+                <button onclick="loadUsers()" class="text-xs text-cyan-400 hover:underline flex items-center gap-1">
+                    <i class="fa-solid fa-rotate"></i> 새로고침
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-950/80 text-slate-400 uppercase text-[11px] border-b border-slate-800">
+                        <tr>
+                            <th class="py-3.5 px-6">ID</th>
+                            <th class="py-3.5 px-6">이메일</th>
+                            <th class="py-3.5 px-6">권한</th>
+                            <th class="py-3.5 px-6">가입일</th>
+                            <th class="py-3.5 px-6">상태</th>
+                            <th class="py-3.5 px-6 text-center">관리 액션</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table-body" class="divide-y divide-slate-800/60">
+                        <tr>
+                            <td colspan="6" class="text-center py-8 text-slate-500">회원 정보를 불러오는 중입니다...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                if (!res.ok) {
+                    alert('관리자 권한이 없거나 로그인이 필요합니다.');
+                    location.href = '/';
+                    return;
+                }
+                const users = await res.json();
+
+                // 통계 계산
+                document.getElementById('stat-total').innerText = `${users.length} 명`;
+                document.getElementById('stat-active').innerText = `${users.filter(u => !u.is_banned).length} 명`;
+                document.getElementById('stat-banned').innerText = `${users.filter(u => u.is_banned).length} 명`;
+
+                const tbody = document.getElementById('user-table-body');
+                if (!users.length) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500">가입된 회원이 없습니다.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = users.map(u => `
+                    <tr class="hover:bg-slate-900/40 transition">
+                        <td class="py-4 px-6 font-mono text-slate-400">${u.id}</td>
+                        <td class="py-4 px-6 font-semibold text-slate-100">${u.email}</td>
+                        <td class="py-4 px-6">
+                            ${u.is_admin ? '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">최고관리자</span>' : '<span class="px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400">일반회원</span>'}
+                        </td>
+                        <td class="py-4 px-6 text-slate-400">${u.created_at.split(' ')[0]}</td>
+                        <td class="py-4 px-6">
+                            ${u.is_banned ? '<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">이용제한</span>' : '<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">정상</span>'}
+                        </td>
+                        <td class="py-4 px-6 text-center space-x-1.5 whitespace-nowrap">
+                            ${u.is_admin ? '<span class="text-slate-600 text-xs">수정불가</span>' : `
+                                <button onclick="toggleBan(${u.id})" class="px-3 py-1 rounded-lg text-xs font-semibold transition ${u.is_banned ? 'bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/30' : 'bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/30'}">
+                                    ${u.is_banned ? '제한 해제' : '이용 정지'}
+                                </button>
+                                <button onclick="deleteUser(${u.id}, '${u.email}')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/30 transition">
+                                    강제 탈퇴
+                                </button>
+                            `}
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function toggleBan(userId) {
+            if (!confirm('해당 회원의 이용 제한 상태를 변경하시겠습니까?')) return;
+            const res = await fetch(`/api/admin/users/${userId}/toggle-ban`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                loadUsers();
+            } else {
+                alert(data.error || '처리 실패');
+            }
+        }
+
+        async function deleteUser(userId, email) {
+            if (!confirm(`정말로 회원 [${email}] 님을 강제 탈퇴(삭제)시키겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+            const res = await fetch(`/api/admin/users/${userId}/delete`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                loadUsers();
+            } else {
+                alert(data.error || '삭제 실패');
+            }
+        }
+
+        window.onload = loadUsers;
+    </script>
+</body>
+</html>

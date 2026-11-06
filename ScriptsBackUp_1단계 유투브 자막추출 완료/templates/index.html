@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 대본 추출기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+    <div class="max-w-4xl mx-auto px-4 py-12">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight flex items-center justify-center gap-3">
+                <i class="fa-brands fa-youtube text-red-600"></i> YouTube 대본 추출기
+            </h1>
+            <p class="text-gray-500 mt-2">유튜브 URL을 넣으면 한글/영어 대본을 타임스탬프와 함께 쉽게 추출합니다.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">1. 추출할 언어 선택 (기본: 영어)</label>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <label id="lang-en-label" class="cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-xl p-4 flex items-center justify-between transition-all">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🇺🇸</span>
+                        <div>
+                            <p class="font-bold text-gray-900">English (기본값)</p>
+                            <p class="text-xs text-gray-500">영문 스크립트 추출</p>
+                        </div>
+                    </div>
+                    <input type="radio" name="lang" value="en" class="w-5 h-5 text-indigo-600" checked onchange="updateLangUI()">
+                </label>
+
+                <label id="lang-ko-label" class="cursor-pointer border-2 border-gray-200 hover:border-gray-300 rounded-xl p-4 flex items-center justify-between transition-all">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🇰🇷</span>
+                        <div>
+                            <p class="font-bold text-gray-900">한국어 (Korean)</p>
+                            <p class="text-xs text-gray-500">한글 스크립트 추출</p>
+                        </div>
+                    </div>
+                    <input type="radio" name="lang" value="ko" class="w-5 h-5 text-indigo-600" onchange="updateLangUI()">
+                </label>
+            </div>
+
+            <label for="url" class="block text-sm font-semibold text-gray-700 mb-2">2. YouTube 동영상 URL</label>
+            <div class="flex gap-2">
+                <input type="text" id="url" placeholder="https://www.youtube.com/watch?v=..." 
+                       class="flex-1 px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900">
+                <button onclick="fetchTranscript()" id="submit-btn"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl transition duration-150 flex items-center gap-2 whitespace-nowrap">
+                    <span>추출하기</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+            <p id="error-msg" class="text-red-500 text-sm mt-3 hidden flex items-center gap-1">
+                <i class="fa-solid fa-circle-exclamation"></i> <span id="error-text"></span>
+            </p>
+        </div>
+
+        <div id="result-container" class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hidden">
+            <div class="border-b border-gray-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 bg-gray-50/50">
+                <div class="flex bg-gray-200 p-1 rounded-lg">
+                    <button id="tab-plain" onclick="switchTab('plain')" class="px-4 py-2 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition">
+                        대본만 보기 (Plain Text)
+                    </button>
+                    <button id="tab-timestamp" onclick="switchTab('timestamp')" class="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition">
+                        타임스탬프 포함 (With Timestamps)
+                    </button>
+                </div>
+
+                <button onclick="copyContent()" class="text-sm font-medium text-gray-600 hover:text-indigo-600 flex items-center gap-1.5 py-1 px-3 border border-gray-300 rounded-lg bg-white shadow-sm hover:border-indigo-500 transition">
+                    <i class="fa-regular fa-copy"></i>
+                    <span id="copy-text">전체 복사</span>
+                </button>
+            </div>
+
+            <div class="p-6">
+                <textarea id="transcript-box" readonly class="w-full h-96 p-4 text-gray-800 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm leading-relaxed resize-none focus:outline-none"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = { plain_text: '', timestamp_text: '' };
+        let activeTab = 'plain';
+
+        function updateLangUI() {
+            const isEn = document.querySelector('input[name="lang"]:checked').value === 'en';
+            const enLabel = document.getElementById('lang-en-label');
+            const koLabel = document.getElementById('lang-ko-label');
+
+            if (isEn) {
+                enLabel.className = "cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-xl p-4 flex items-center justify-between transition-all";
+                koLabel.className = "cursor-pointer border-2 border-gray-200 hover:border-gray-300 rounded-xl p-4 flex items-center justify-between transition-all";
+            } else {
+                koLabel.className = "cursor-pointer border-2 border-indigo-600 bg-indigo-50/50 rounded-xl p-4 flex items-center justify-between transition-all";
+                enLabel.className = "cursor-pointer border-2 border-gray-200 hover:border-gray-300 rounded-xl p-4 flex items-center justify-between transition-all";
+            }
+        }
+
+        function switchTab(type) {
+            activeTab = type;
+            const plainBtn = document.getElementById('tab-plain');
+            const timeBtn = document.getElementById('tab-timestamp');
+            const box = document.getElementById('transcript-box');
+
+            if (type === 'plain') {
+                plainBtn.className = "px-4 py-2 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition";
+                timeBtn.className = "px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition";
+                box.value = currentData.plain_text;
+            } else {
+                timeBtn.className = "px-4 py-2 rounded-md text-sm font-bold bg-white text-gray-900 shadow-sm transition";
+                plainBtn.className = "px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition";
+                box.value = currentData.timestamp_text;
+            }
+        }
+
+        async function fetchTranscript() {
+            const urlInput = document.getElementById('url').value.trim();
+            const lang = document.querySelector('input[name="lang"]:checked').value;
+            const errorMsg = document.getElementById('error-msg');
+            const errorText = document.getElementById('error-text');
+            const submitBtn = document.getElementById('submit-btn');
+            const resultContainer = document.getElementById('result-container');
+
+            if (!urlInput) {
+                errorText.innerText = "유튜브 URL을 입력해주세요.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            errorMsg.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 추출 중...`;
+
+            try {
+                const response = await fetch('/api/transcript', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput, lang: lang })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '대본 추출에 실패했습니다.');
+                }
+
+                currentData = data;
+                resultContainer.classList.remove('hidden');
+                switchTab(activeTab);
+
+            } catch (err) {
+                errorText.innerText = err.message;
+                errorMsg.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<span>추출하기</span><i class="fa-solid fa-arrow-right"></i>`;
+            }
+        }
+
+        function copyContent() {
+            const box = document.getElementById('transcript-box');
+            box.select();
+            navigator.clipboard.writeText(box.value).then(() => {
+                const copyText = document.getElementById('copy-text');
+                copyText.innerText = "복사 완료!";
+                setTimeout(() => { copyText.innerText = "전체 복사"; }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
