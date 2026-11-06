@@ -242,6 +242,7 @@ def admin_delete_user(user_id):
         conn.commit()
     return jsonify({'success': True})
 
+# ----------------- [화질 정보 분석 API: 모바일 클라이언트 위장] -----------------
 @app.route('/api/video/formats', methods=['POST'])
 def get_video_formats():
     data = request.json or {}
@@ -251,7 +252,16 @@ def get_video_formats():
         return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
     clean_url = f"https://www.youtube.com/watch?v={video_id}"
-    ydl_opts = {'quiet': True, 'no_warnings': True}
+    ydl_opts = {
+        'quiet': True, 
+        'no_warnings': True,
+        # [봇 차단 우회] iOS 및 Android 클라이언트로 위장
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
+    }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -302,6 +312,7 @@ def get_video_formats():
     except Exception as e:
         return jsonify({'error': f'화질 정보 분석 실패: {str(e)}'}), 500
 
+# ----------------- [대본 추출 API: 모바일 클라이언트 위장] -----------------
 @app.route('/api/transcript', methods=['POST'])
 def get_transcript():
     if 'user_id' in session:
@@ -324,12 +335,6 @@ def get_transcript():
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
     clean_url = f"https://www.youtube.com/watch?v={video_id}"
-    browser_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': 'https://www.youtube.com/',
-        'Origin': 'https://www.youtube.com'
-    }
 
     ydl_opts = {
         'skip_download': True,
@@ -338,7 +343,11 @@ def get_transcript():
         'subtitleslangs': ['all'],
         'quiet': True,
         'no_warnings': True,
-        'http_headers': browser_headers
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
     }
 
     try:
@@ -377,7 +386,7 @@ def get_transcript():
             try:
                 with ydl.urlopen(download_url) as resp: content = resp.read().decode('utf-8')
             except Exception:
-                req = urllib.request.Request(download_url, headers=browser_headers)
+                req = urllib.request.Request(download_url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req) as resp: content = resp.read().decode('utf-8')
 
             sub_data = json.loads(content)
@@ -408,7 +417,7 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [미디어 다운로드 API: 인코딩 완벽 호환성 보장] -----------------
+# ----------------- [미디어 다운로드 API: 모바일 클라이언트 위장] -----------------
 @app.route('/api/download')
 def download_media():
     if 'user_id' in session:
@@ -437,16 +446,24 @@ def download_media():
         try: os.remove(f)
         except: pass
 
+    # [핵심] 서버 IP 봇 차단을 우회하는 iOS/Android 클라이언트 설정
+    base_ydl_opts = {
+        'quiet': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
+    }
+
     if download_type == 'mp3':
         ydl_opts = {
+            **base_ydl_opts,
             'format': 'bestaudio/best',
             'outtmpl': f"{base_filename}.%(ext)s",
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-            'quiet': True,
         }
     else:
-        # [핵심] AV1/VP9 코덱으로 인한 재생 불가 문제를 완벽 해결:
-        # 모든 기기에서 100% 재생되는 H.264(avc1) 비디오 및 M4A/AAC 오디오를 최우선으로 지정
         if height != 'best' and height.isdigit():
             format_str = (
                 f"bestvideo[height<={height}][vcodec^=avc1]+bestaudio[ext=m4a]/"
@@ -462,12 +479,11 @@ def download_media():
             )
 
         ydl_opts = {
+            **base_ydl_opts,
             'format': format_str,
             'outtmpl': f"{base_filename}.%(ext)s",
             'merge_output_format': 'mp4',
-            # 스트리밍 및 플레이어 즉시 재생을 위한 faststart 플래그 부착
             'postprocessor_args': ['-movflags', 'faststart'],
-            'quiet': True,
         }
 
     try:
