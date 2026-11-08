@@ -23,6 +23,23 @@ DB_FILE = 'service.db'
 DOWNLOAD_FOLDER = os.path.join(os.getcwd(), 'temp_downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# [핵심] 쿠키 파일이 프로젝트 폴더에 있으면 자동으로 유튜브 인증 신분증으로 장착
+COOKIES_FILE = os.path.join(os.getcwd(), 'cookies.txt')
+
+def get_base_ydl_opts():
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
+    }
+    if os.path.exists(COOKIES_FILE):
+        opts['cookiefile'] = COOKIES_FILE
+    return opts
+
 def get_coupang_sponsor_url():
     return "https://link.coupang.com/a/idfYJANZHU"
 
@@ -203,8 +220,7 @@ def logout():
 
 @app.route('/admin')
 def admin_page():
-    if not is_admin():
-        return redirect('/')
+    if not is_admin(): return redirect('/')
     return render_template('admin.html')
 
 @app.route('/api/admin/users', methods=['GET'])
@@ -242,26 +258,16 @@ def admin_delete_user(user_id):
         conn.commit()
     return jsonify({'success': True})
 
-# ----------------- [화질 정보 분석 API: 모바일 클라이언트 위장] -----------------
+# ----------------- [화질 분석 API] -----------------
 @app.route('/api/video/formats', methods=['POST'])
 def get_video_formats():
     data = request.json or {}
     url = data.get('url', '').strip()
     video_id = extract_video_id(url)
-    if not video_id:
-        return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
+    if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
     clean_url = f"https://www.youtube.com/watch?v={video_id}"
-    ydl_opts = {
-        'quiet': True, 
-        'no_warnings': True,
-        # [봇 차단 우회] iOS 및 Android 클라이언트로 위장
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'android', 'web']
-            }
-        }
-    }
+    ydl_opts = get_base_ydl_opts()
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -278,7 +284,6 @@ def get_video_formats():
                     v_size = f.get('filesize') or f.get('filesize_approx')
                     if not v_size and f.get('tbr') and duration:
                         v_size = (f.get('tbr') * 1000 / 8) * duration
-
                     total_bytes = (v_size or 0) + audio_size
                     if h not in available_resolutions or total_bytes > available_resolutions[h]:
                         available_resolutions[h] = total_bytes
@@ -298,21 +303,13 @@ def get_video_formats():
                 elif h >= 480: label += " (일반화질)"
                 else: label += " (저용량)"
 
-                format_list.append({
-                    'height': h,
-                    'label': label,
-                    'size_str': size_str
-                })
+                format_list.append({'height': h, 'label': label, 'size_str': size_str})
 
-            return jsonify({
-                'success': True,
-                'title': info.get('title', '동영상'),
-                'formats': format_list
-            })
+            return jsonify({'success': True, 'title': info.get('title', '동영상'), 'formats': format_list})
     except Exception as e:
         return jsonify({'error': f'화질 정보 분석 실패: {str(e)}'}), 500
 
-# ----------------- [대본 추출 API: 모바일 클라이언트 위장] -----------------
+# ----------------- [대본 추출 API] -----------------
 @app.route('/api/transcript', methods=['POST'])
 def get_transcript():
     if 'user_id' in session:
@@ -320,12 +317,11 @@ def get_transcript():
             cursor = conn.cursor()
             cursor.execute("SELECT is_banned FROM users WHERE id = ?", (session['user_id'],))
             row = cursor.fetchone()
-            if row and row[0] == 1:
-                return jsonify({'error': '이용이 정지된 계정입니다.'}), 403
+            if row and row[0] == 1: return jsonify({'error': '이용이 정지된 계정입니다.'}), 403
     else:
         quota = get_today_usage_info()
         if quota['remaining'] != '무제한' and quota['remaining'] <= 0:
-            return jsonify({'error': '오늘 비회원 무료 한도(5회)를 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다!'}), 429
+            return jsonify({'error': '오늘 무료 한도를 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다!'}), 429
 
     data = request.json
     url = data.get('url', '').strip()
@@ -335,19 +331,12 @@ def get_transcript():
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
     clean_url = f"https://www.youtube.com/watch?v={video_id}"
-
     ydl_opts = {
+        **get_base_ydl_opts(),
         'skip_download': True,
         'writesubtitles': True,
         'writeautomaticsub': True,
-        'subtitleslangs': ['all'],
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'android', 'web']
-            }
-        }
+        'subtitleslangs': ['all']
     }
 
     try:
@@ -393,8 +382,7 @@ def get_transcript():
             plain_text_list = []
             timestamp_text_list = []
 
-            events = sub_data.get('events', [])
-            for ev in events:
+            for ev in sub_data.get('events', []):
                 if 'segs' in ev:
                     text_parts = [seg.get('utf8', '') for seg in ev['segs']]
                     full_text = "".join(text_parts).replace('\n', ' ').strip()
@@ -417,7 +405,7 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [미디어 다운로드 API: 모바일 클라이언트 위장] -----------------
+# ----------------- [미디어 다운로드 API: 쿠키 인증 자동 적용] -----------------
 @app.route('/api/download')
 def download_media():
     if 'user_id' in session:
@@ -425,12 +413,11 @@ def download_media():
             cursor = conn.cursor()
             cursor.execute("SELECT is_banned FROM users WHERE id = ?", (session['user_id'],))
             row = cursor.fetchone()
-            if row and row[0] == 1:
-                return "이용이 정지된 계정입니다.", 403
+            if row and row[0] == 1: return "이용이 정지된 계정입니다.", 403
     else:
         quota = get_today_usage_info()
         if quota['remaining'] != '무제한' and quota['remaining'] <= 0:
-            return "오늘 무료 한도(5회)를 모두 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다.", 429
+            return "오늘 무료 한도를 모두 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다.", 429
 
     url = request.args.get('url', '').strip()
     download_type = request.args.get('type', 'mp3')
@@ -446,15 +433,7 @@ def download_media():
         try: os.remove(f)
         except: pass
 
-    # [핵심] 서버 IP 봇 차단을 우회하는 iOS/Android 클라이언트 설정
-    base_ydl_opts = {
-        'quiet': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'android', 'web']
-            }
-        }
-    }
+    base_ydl_opts = get_base_ydl_opts()
 
     if download_type == 'mp3':
         ydl_opts = {
