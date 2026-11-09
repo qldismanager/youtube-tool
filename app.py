@@ -5,7 +5,6 @@ import yt_dlp
 import re
 import json
 import urllib.request
-import urllib.parse
 import os
 import glob
 import sqlite3
@@ -24,6 +23,37 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, 'service.db')
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+COOKIES_FILE = os.path.join(BASE_DIR, 'cookies.txt')
+
+# [핵심] 로컬/서버 공통: 봇 차단을 피하기 위한 통합 쿠키 및 엔진 옵션
+def get_safe_ydl_opts(extra=None):
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        }
+    }
+    
+    # 1. cookies.txt 파일이 있으면 우선 탑재 (Render 서버용)
+    if os.path.exists(COOKIES_FILE):
+        opts['cookiefile'] = COOKIES_FILE
+    else:
+        # 2. 로컬 컴퓨터에서는 크롬/엣지 브라우저에서 쿠키 직접 자동 참조
+        try:
+            opts['cookiesfrombrowser'] = ('chrome',)
+        except Exception:
+            try:
+                opts['cookiesfrombrowser'] = ('edge',)
+            except Exception:
+                pass
+
+    if extra:
+        opts.update(extra)
+    return opts
 
 def extract_clean_video_info(url):
     patterns = [r"(?:v=|\/|youtu\.be\/|embed\/)([0-9A-Za-z_-]{11})"]
@@ -262,14 +292,12 @@ def get_transcript():
     video_id, clean_url = extract_clean_video_info(url)
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
+    ydl_opts = get_safe_ydl_opts({
         'skip_download': True,
         'writesubtitles': True,
         'writeautomaticsub': True,
         'subtitleslangs': ['all']
-    }
+    })
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -337,9 +365,9 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [핵심: 백엔드 무차단 스마트 다운로드 스트림 API] -----------------
-@app.route('/api/download/stream', methods=['POST'])
-def download_stream():
+# ----------------- [핵심: 100% 자립형 무차단 미디어 변환 및 다운로드 API] -----------------
+@app.route('/api/download/execute', methods=['POST'])
+def execute_download():
     if 'user_id' in session:
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
@@ -359,67 +387,78 @@ def download_stream():
     video_id, clean_url = extract_clean_video_info(raw_url)
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
-    # 안정적인 글로벌 오픈소스 미디어 해석 엔진들 (백엔드 서버 대 서버 호출로 CORS 차단 0%)
-    api_endpoints = [
-        "https://api.cobalt.tools/api/json",
-        "https://cobalt.api.kwiatekm.pl/api/json",
-        "https://co.wuk.sh/api/json"
-    ]
+    base_filename = os.path.join(DOWNLOAD_FOLDER, f"{video_id}_{download_type}_{quality}")
 
-    payload = {
-        'url': clean_url,
-        'vQuality': quality,
-        'filenamePattern': 'basic',
-        'isAudioOnly': (download_type == 'mp3')
-    }
+    # 이전 임시 파일 삭제
+    for f in glob.glob(f"{base_filename}.*"):
+        try: os.remove(f)
+        except: pass
+
+    # 안전하고 확실한 포맷 설정
     if download_type == 'mp3':
-        payload['aFormat'] = 'mp3'
-
-    payload_data = json.dumps(payload).encode('utf-8')
-    headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-    }
-
-    # 1. 고속 변환 엔진 시도
-    for endpoint in api_endpoints:
-        try:
-            req = urllib.request.Request(endpoint, data=payload_data, headers=headers, method='POST')
-            with urllib.request.urlopen(req, timeout=10) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                final_url = result.get('url') or (result.get('picker') and result['picker'][0]['url'])
-                if final_url:
-                    record_usage()
-                    return jsonify({
-                        'success': True,
-                        'download_url': final_url,
-                        'filename': f"YouTube_{video_id}.{download_type}"
-                    })
-        except Exception:
-            continue
-
-    # 2. 만약 외부 엔진이 일시 지연될 경우, yt-dlp 로컬 스트림 추출 Fallback
-    try:
-        ydl_opts = {
-            'quiet': True,
-            'skip_download': True,
-            'format': 'bestaudio/best' if download_type == 'mp3' else f'best[height<={quality}]/best'
+        extra_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': f"{base_filename}.%(ext)s",
+            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(clean_url, download=False)
-            stream_url = info.get('url')
-            if stream_url:
-                record_usage()
-                return jsonify({
-                    'success': True,
-                    'download_url': stream_url,
-                    'filename': f"{info.get('title', video_id)}.{download_type}"
-                })
-    except Exception:
-        pass
+    else:
+        # 단일 파일(b) 우선, 없으면 분리형 스트림 자동 결합
+        extra_opts = {
+            'format': f'best[height<={quality}]/bestvideo[height<={quality}]+bestaudio/best',
+            'outtmpl': f"{base_filename}.%(ext)s",
+            'merge_output_format': 'mp4',
+            'postprocessor_args': ['-movflags', 'faststart'],
+        }
 
-    return jsonify({'error': '현재 유튜브 미디어 변환 서버가 일시 지연 중입니다. 잠시 후 다시 시도해 주세요.'}), 503
+    ydl_opts = get_safe_ydl_opts(extra_opts)
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(clean_url, download=True)
+            video_title = info.get('title', 'YouTube_Media')
+            safe_title = re.sub(r'[\\/*?:"<>|]', "", video_title)[:60]
+
+        target_ext = 'mp3' if download_type == 'mp3' else 'mp4'
+        expected_file = f"{base_filename}.{target_ext}"
+        if not os.path.exists(expected_file):
+            matched = glob.glob(f"{base_filename}.*")
+            if matched: expected_file = matched[0]
+            else: return jsonify({'error': '미디어 파일 변환 실패'}), 500
+
+        record_usage()
+        
+        file_id = os.path.basename(expected_file)
+        quality_suffix = f"_{quality}p" if download_type == 'mp4' else ""
+        final_filename = f"{safe_title}{quality_suffix}.{target_ext}"
+
+        return jsonify({
+            'success': True,
+            'file_id': file_id,
+            'download_name': final_filename
+        })
+
+    except Exception as e:
+        err_msg = str(e)
+        return jsonify({'error': f'다운로드 오류 발생: {err_msg}'}), 500
+
+# 생성된 실제 파일을 브라우저로 내려보내는 엔드포인트
+@app.route('/api/download/file/<file_id>')
+def serve_file(file_id):
+    file_path = os.path.join(DOWNLOAD_FOLDER, file_id)
+    download_name = request.args.get('name', file_id)
+
+    if not os.path.exists(file_path):
+        return "파일이 만료되었거나 존재하지 않습니다.", 404
+
+    @after_this_request
+    def cleanup(response):
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except: pass
+        return response
+
+    return send_file(file_path, as_attachment=True, download_name=download_name)
 
 @app.route('/api/board', methods=['GET'])
 def get_posts():
