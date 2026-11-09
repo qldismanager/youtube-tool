@@ -13,7 +13,7 @@ try:
     import static_ffmpeg
     static_ffmpeg.add_paths()
 except Exception as e:
-    print(f"Warning: static_ffmpeg skipped: {e}")
+    pass
 
 app = Flask(__name__)
 app.secret_key = 'cosmic_secret_youtube_admin_key_#987654'
@@ -24,60 +24,28 @@ DB_FILE = os.path.join(BASE_DIR, 'service.db')
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# [핵심] 절대 경로 기반 쿠키 파일 설정 및 자동 복구 시스템
-COOKIES_FILE = os.path.join(BASE_DIR, 'cookies.txt')
-
-# 제공해주신 정품 유튜브 쿠키 원문 (서버에 파일이 없더라도 자동 생성 보장)
-EMBEDDED_COOKIES_DATA = """# Netscape HTTP Cookie File
-# https://curl.haxx.se/rfc/cookie_spec.html
-.youtube.com	TRUE	/	TRUE	1828752801	PREF	tz=Asia.Seoul&f7=100
-.youtube.com	TRUE	/	TRUE	1806905661	__Secure-BUCKET	CJMC
-.youtube.com	TRUE	/	TRUE	1794194528	GPS	1
-.youtube.com	TRUE	/	FALSE	1828752799	HSID	ANdjJuqQaWzGwmPzX
-.youtube.com	TRUE	/	TRUE	1828752799	SSID	A3Ib2Ngh3t4o4m_Pk
-.youtube.com	TRUE	/	FALSE	1828752799	APISID	3tr_Y5AAnnrw2EGA/AfTQe4yQPNjhbT9J7
-.youtube.com	TRUE	/	TRUE	1828752799	SAPISID	NfGAUCWKFhKqahXf/ABfZAgm0S1gLFExV_
-.youtube.com	TRUE	/	TRUE	1828752799	__Secure-1PAPISID	NfGAUCWKFhKqahXf/ABfZAgm0S1gLFExV_
-.youtube.com	TRUE	/	TRUE	1828752799	__Secure-3PAPISID	NfGAUCWKFhKqahXf/ABfZAgm0S1gLFExV_
-.youtube.com	TRUE	/	TRUE	1828752799	LOGIN_INFO	AFmmF2swRAIgdXKXZtbm7aV8DGCYwe7Zq74Zjlrhdj5VZpHZCT1lf6ACIDKFmAyNFT16Z5LJKtk2d5ZgnEFgHCRHTLo60ai7O8j1:QUQ3MjNmeTVqcngtUUU3MXBMOVJzMjVwNjJnaElIcXJfRkZCaE84VERKaTBlSTI3bTZmMkxsY3BxWldROGVVaTNqNDk1QWFyV0dETVMtV1FXdW50cVM1OXlMZ3NLejVteEk4RGtqOEVMUVNoVHl5T3NkVl9LcVlwUnc0Z3dwVmJqOTZUUmVReFVDcVJpdy1jZU0tcFlsSldmaGpBdzdxRkNn
-.youtube.com	TRUE	/	TRUE	1825728800	__Secure-1PSIDTS	sidts-CjcBnJZzaj5_-EhCqjRH1xWzmZ9D6Jrpv7NIIGVwFUikx7ZDBVyXWpHUEh0EU57QiXY6GxyYy1T0EAA
-.youtube.com	TRUE	/	TRUE	1794193400	__Secure-1PSIDRTS	sidts-CjcBnJZzaj5_-EhCqjRH1xWzmZ9D6Jrpv7NIIGVwFUikx7ZDBVyXWpHUEh0EU57QiXY6GxyYy1T0EAA
-.youtube.com	TRUE	/	TRUE	1825728800	__Secure-3PSIDTS	sidts-CjcBnJZzaj5_-EhCqjRH1xWzmZ9D6Jrpv7NIIGVwFUikx7ZDBVyXWpHUEh0EU57QiXY6GxyYy1T0EAA
-.youtube.com	TRUE	/	TRUE	1794193400	__Secure-3PSIDRTS	sidts-CjcBnJZzaj5_-EhCqjRH1xWzmZ9D6Jrpv7NIIGVwFUikx7ZDBVyXWpHUEh0EU57QiXY6GxyYy1T0EAA
-.youtube.com	TRUE	/	FALSE	1828752800	SID	g.a000EgmDakW6drCdaGpqBHikHGhBtpgGTyBTv5uQQaO3gbWK_mR-ZrYTZM1oIB4C51jhFfFAyQACgYKAboSARQSFQHGX2MivktfLlTwW3_faaDxp89w9RoVAUF8yKpjYkX8KTU2DWubAWUha9lc0076
-.youtube.com	TRUE	/	TRUE	1828752800	__Secure-1PSID	g.a000EgmDakW6drCdaGpqBHikHGhBtpgGTyBTv5uQQaO3gbWK_mR-hMb0xYod4V0Uas-028hzIgACgYKAY0SARQSFQHGX2Mi78VAjnwNSTzio5rGGw25rBoVAUF8yKoGT0pTh8sA4f555rIv5f1j0076
-.youtube.com	TRUE	/	TRUE	1828752800	__Secure-3PSID	g.a000EgmDakW6drCdaGpqBHikHGhBtpgGTyBTv5uQQaO3gbWK_mR-AyXFKvieOwjD2jatl8FMZwACgYKAcUSARQSFQHGX2MiMEuQ0uBctOyqFMpT71x9tBoVAUF8yKriOx22BYAnRvrctk0eU4Dx0076
-.youtube.com	TRUE	/	TRUE	1794193435	CONSISTENCY	AIudn8pJptv45or3Svs_xWyGdH2rUTDISoI-VG951MHAWKr2PxzDNHlldWKoNPW6RpwcYT002N-GTlT2jSe0ppAzlIvY_hRLCRJ64l139t3tUTc8Qj7OXw51-Y3WrBQyp2t2u4okVmUvr-vD4D7O66fF
-.youtube.com	TRUE	/	FALSE	1825728847	SIDCC	APD_SKE1xsg8P1q13TkjLb4eLhb9i2O0l1c72fYJkN0UgBRe1zh6xOZRXhpu0wZdIg0aRQ-F
-.youtube.com	TRUE	/	TRUE	1825728847	__Secure-1PSIDCC	APD_SKHrsR1JOvF2YzYczhmerN4sHpeka2b1dyMOKmdlDh4LhmdOQ_ERjTPSrunpgV5-2B_KHg
-.youtube.com	TRUE	/	TRUE	1825728847	__Secure-3PSIDCC	APD_SKGloDFbde4qP603PfeFSjGmQK_xtLKJF_dYS1MEu7semvWFhVMrsoXIAwZvkeCXox-H
-.youtube.com	TRUE	/	TRUE	1809744803	VISITOR_INFO1_LIVE	mS7dN90wUh8
-.youtube.com	TRUE	/	TRUE	1809744803	VISITOR_PRIVACY_METADATA	CgJLUhIEGgAgUA%3D%3D
-.youtube.com	TRUE	/	TRUE	0	YSC	d434CC7a8o0
-.youtube.com	TRUE	/	TRUE	1809665864	__Secure-YNID	CuwBCAUSngEBDB6PDJNhK1KzKyBWiDk-v11pmHfuyWRHbhM0wtyr1KpbD10j29WaeWbmHslaBS5VHLAv3jKByi__Gb44v_oDJEOAe4d_rXQePmrUJqpk8SA1bIuvFiu0szDG3awoPRIF1KWDJnZdltBxfOzVKCsUs7_ZK9OaOkSlrEbsi0RfpYgzuX4wRqrjxojCZZ8yBsj2zqOD2xnyI3TjuJpiaygFMkUBHFj1ahHkOjLQZVp1h1yuIm52nwykRmgkF48_QtwwNCy73E1mDdPYA-cRJS4jmcYwfMEjQwNEPPZQAYvhjL9q9cgkpwM
-.youtube.com	TRUE	/	TRUE	1809665864	__Secure-ROLLOUT_TOKEN	CJCRg-7x8t6l-QEQg4OQhOD4kgMYk66n-8r3lwM%3D
-"""
-
-def ensure_cookies_file():
-    """서버가 시작될 때 cookies.txt 파일이 없거나 비어있으면 강제로 올바른 쿠키를 씁니다."""
-    try:
-        with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
-            f.write(EMBEDDED_COOKIES_DATA.strip())
-    except Exception as e:
-        print(f"Cookie write warning: {e}")
-
-ensure_cookies_file()
-
+# [핵심] 2026년 최신 데이터센터 봇 차단 우회 옵션 (mweb/tv client 세션 풀 활용)
 def get_base_ydl_opts():
     opts = {
         'quiet': True,
         'no_warnings': True,
-        'cookiefile': COOKIES_FILE, # 절대 경로 쿠키 강제 탑재
+        # 유튜브 TV 및 모바일 웹 클라이언트는 데이터센터 IP 차단 검사를 하지 않음
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['tv', 'mweb', 'android'],
+                'player_skip': ['webpage', 'configs'],
+            }
+        },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36',
             'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
         }
     }
+    
+    cookies_path = os.path.join(BASE_DIR, 'cookies.txt')
+    if os.path.exists(cookies_path):
+        opts['cookiefile'] = cookies_path
+
     return opts
 
 def get_coupang_sponsor_url():
@@ -298,7 +266,7 @@ def admin_delete_user(user_id):
         conn.commit()
     return jsonify({'success': True})
 
-# ----------------- [화질 분석 API: 쿠키 인증 강제] -----------------
+# ----------------- [화질 분석 API] -----------------
 @app.route('/api/video/formats', methods=['POST'])
 def get_video_formats():
     data = request.json or {}
@@ -376,7 +344,7 @@ def get_video_formats():
             ]
         })
 
-# ----------------- [대본 추출 API: 쿠키 인증 강제] -----------------
+# ----------------- [대본 추출 API] -----------------
 @app.route('/api/transcript', methods=['POST'])
 def get_transcript():
     if 'user_id' in session:
@@ -472,7 +440,7 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [미디어 다운로드 API: 쿠키 인증 강제] -----------------
+# ----------------- [미디어 다운로드 API] -----------------
 @app.route('/api/download')
 def download_media():
     if 'user_id' in session:
