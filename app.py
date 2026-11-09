@@ -5,6 +5,7 @@ import yt_dlp
 import re
 import json
 import urllib.request
+import urllib.parse
 import os
 import glob
 import sqlite3
@@ -24,29 +25,19 @@ DB_FILE = os.path.join(BASE_DIR, 'service.db')
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# 봇 탐지 우회를 위한 표준 옵션
-def get_base_ydl_opts():
-    opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'noplaylist': True,  # 재생목록 탐색 원천 차단 (봇 탐지 회피 핵심)
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web'],
-                'player_skip': ['webpage', 'configs'],
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36',
-            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        }
-    }
-    
-    cookies_path = os.path.join(BASE_DIR, 'cookies.txt')
-    if os.path.exists(cookies_path):
-        opts['cookiefile'] = cookies_path
+def extract_clean_video_info(url):
+    patterns = [r"(?:v=|\/|youtu\.be\/|embed\/)([0-9A-Za-z_-]{11})"]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            v_id = match.group(1)
+            return v_id, f"https://www.youtube.com/watch?v={v_id}"
+    return None, None
 
-    return opts
+def format_time(seconds):
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes:02d}:{secs:02d}"
 
 def get_coupang_sponsor_url():
     return "https://link.coupang.com/a/idfYJANZHU"
@@ -142,24 +133,6 @@ def record_usage():
             (identifier, today_str)
         )
         conn.commit()
-
-# [핵심] 재생목록(&list=...), 타임스탬프 등 불필요한 파라미터 완전 제거 함수
-def extract_clean_video_info(url):
-    patterns = [
-        r"(?:v=|\/|youtu\.be\/|embed\/)([0-9A-Za-z_-]{11})"
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            v_id = match.group(1)
-            # 오직 11자리 비디오 ID만으로 구성된 순수 영상 주소 생성
-            return v_id, f"https://www.youtube.com/watch?v={v_id}"
-    return None, None
-
-def format_time(seconds):
-    minutes = int(seconds // 60)
-    secs = int(seconds % 60)
-    return f"{minutes:02d}:{secs:02d}"
 
 @app.route('/')
 def index():
@@ -268,81 +241,6 @@ def admin_delete_user(user_id):
         conn.commit()
     return jsonify({'success': True})
 
-# ----------------- [화질 분석 API] -----------------
-@app.route('/api/video/formats', methods=['POST'])
-def get_video_formats():
-    data = request.json or {}
-    url = data.get('url', '').strip()
-    video_id, clean_url = extract_clean_video_info(url)
-    if not video_id:
-        return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
-
-    ydl_opts = get_base_ydl_opts()
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(clean_url, download=False)
-            formats = info.get('formats', [])
-            duration = info.get('duration', 0)
-            title = info.get('title', 'YouTube 동영상')
-
-            audio_size = (128 * 1000 / 8) * duration if duration else 0
-            available_resolutions = {}
-
-            for f in formats:
-                h = f.get('height')
-                if h and h in [144, 240, 360, 480, 720, 1080, 1440, 2160]:
-                    v_size = f.get('filesize') or f.get('filesize_approx')
-                    if not v_size and f.get('tbr') and duration:
-                        v_size = (f.get('tbr') * 1000 / 8) * duration
-
-                    total_bytes = (v_size or 0) + audio_size
-                    if h not in available_resolutions or total_bytes > available_resolutions[h]:
-                        available_resolutions[h] = total_bytes
-
-            format_list = []
-            if not available_resolutions:
-                available_resolutions = {1080: 0, 720: 0, 480: 0, 360: 0}
-
-            for h in sorted(available_resolutions.keys(), reverse=True):
-                est_bytes = available_resolutions[h]
-                if est_bytes > 0:
-                    mb = est_bytes / (1024 * 1024)
-                    size_str = f"약 {mb:.1f} MB" if mb < 1000 else f"약 {mb/1024:.2f} GB"
-                else:
-                    size_str = "용량 최적화"
-
-                label = f"{h}p"
-                if h >= 1080: label += " (FHD 고화질)"
-                elif h >= 720: label += " (HD 표준)"
-                elif h >= 480: label += " (일반화질)"
-                else: label += " (저용량)"
-
-                format_list.append({
-                    'height': h,
-                    'label': label,
-                    'size_str': size_str
-                })
-
-            return jsonify({
-                'success': True,
-                'title': title,
-                'clean_url': clean_url,
-                'formats': format_list
-            })
-    except Exception as e:
-        return jsonify({
-            'success': True,
-            'title': 'YouTube 동영상',
-            'clean_url': clean_url,
-            'formats': [
-                {'height': 1080, 'label': '1080p (FHD 고화질)', 'size_str': '용량 최적화'},
-                {'height': 720, 'label': '720p (HD 표준)', 'size_str': '용량 최적화'},
-                {'height': 480, 'label': '480p (일반화질)', 'size_str': '용량 최적화'},
-                {'height': 360, 'label': '360p (저용량)', 'size_str': '용량 최적화'}
-            ]
-        })
-
 # ----------------- [대본 추출 API] -----------------
 @app.route('/api/transcript', methods=['POST'])
 def get_transcript():
@@ -357,7 +255,7 @@ def get_transcript():
         if quota['remaining'] != '무제한' and quota['remaining'] <= 0:
             return jsonify({'error': '오늘 무료 한도를 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다!'}), 429
 
-    data = request.json
+    data = request.json or {}
     url = data.get('url', '').strip()
     target_lang = data.get('lang', 'en')
 
@@ -365,7 +263,8 @@ def get_transcript():
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
     ydl_opts = {
-        **get_base_ydl_opts(),
+        'quiet': True,
+        'no_warnings': True,
         'skip_download': True,
         'writesubtitles': True,
         'writeautomaticsub': True,
@@ -438,85 +337,89 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [미디어 다운로드 API: 순수 단일 URL 강제] -----------------
-@app.route('/api/download')
-def download_media():
+# ----------------- [핵심: 백엔드 무차단 스마트 다운로드 스트림 API] -----------------
+@app.route('/api/download/stream', methods=['POST'])
+def download_stream():
     if 'user_id' in session:
         with sqlite3.connect(DB_FILE) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT is_banned FROM users WHERE id = ?", (session['user_id'],))
             row = cursor.fetchone()
-            if row and row[0] == 1: return "이용이 정지된 계정입니다.", 403
+            if row and row[0] == 1: return jsonify({'error': '이용이 정지된 계정입니다.'}), 403
     else:
         quota = get_today_usage_info()
         if quota['remaining'] != '무제한' and quota['remaining'] <= 0:
-            return "오늘 무료 한도를 모두 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다.", 429
+            return jsonify({'error': '오늘 무료 한도를 모두 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다.'}), 429
 
-    raw_url = request.args.get('url', '').strip()
-    download_type = request.args.get('type', 'mp3')
-    height = request.args.get('quality', 'best')
+    data = request.json or {}
+    raw_url = data.get('url', '').strip()
+    download_type = data.get('type', 'mp3')
+    quality = data.get('quality', '720')
 
-    # [핵심] 긴 재생목록 파라미터를 완전히 버리고 오직 순수 단일 영상 주소로만 다운로드
     video_id, clean_url = extract_clean_video_info(raw_url)
-    if not video_id: return "유효한 유튜브 URL이 아닙니다.", 400
+    if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
-    base_filename = os.path.join(DOWNLOAD_FOLDER, f"{video_id}_{download_type}_{height}")
+    # 안정적인 글로벌 오픈소스 미디어 해석 엔진들 (백엔드 서버 대 서버 호출로 CORS 차단 0%)
+    api_endpoints = [
+        "https://api.cobalt.tools/api/json",
+        "https://cobalt.api.kwiatekm.pl/api/json",
+        "https://co.wuk.sh/api/json"
+    ]
 
-    for f in glob.glob(f"{base_filename}.*"):
-        try: os.remove(f)
-        except: pass
-
-    base_ydl_opts = get_base_ydl_opts()
-
+    payload = {
+        'url': clean_url,
+        'vQuality': quality,
+        'filenamePattern': 'basic',
+        'isAudioOnly': (download_type == 'mp3')
+    }
     if download_type == 'mp3':
-        ydl_opts = {
-            **base_ydl_opts,
-            'format': 'ba/b',
-            'outtmpl': f"{base_filename}.%(ext)s",
-            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
-        }
-    else:
-        if height != 'best' and height.isdigit():
-            format_str = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best"
-        else:
-            format_str = "best/bestvideo+bestaudio"
+        payload['aFormat'] = 'mp3'
 
-        ydl_opts = {
-            **base_ydl_opts,
-            'format': format_str,
-            'outtmpl': f"{base_filename}.%(ext)s",
-            'merge_output_format': 'mp4',
-            'postprocessor_args': ['-movflags', 'faststart'],
-        }
+    payload_data = json.dumps(payload).encode('utf-8')
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+    }
 
+    # 1. 고속 변환 엔진 시도
+    for endpoint in api_endpoints:
+        try:
+            req = urllib.request.Request(endpoint, data=payload_data, headers=headers, method='POST')
+            with urllib.request.urlopen(req, timeout=10) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                final_url = result.get('url') or (result.get('picker') and result['picker'][0]['url'])
+                if final_url:
+                    record_usage()
+                    return jsonify({
+                        'success': True,
+                        'download_url': final_url,
+                        'filename': f"YouTube_{video_id}.{download_type}"
+                    })
+        except Exception:
+            continue
+
+    # 2. 만약 외부 엔진이 일시 지연될 경우, yt-dlp 로컬 스트림 추출 Fallback
     try:
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'format': 'bestaudio/best' if download_type == 'mp3' else f'best[height<={quality}]/best'
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # 순수한 단일 URL(clean_url)로 다운로드
-            info = ydl.extract_info(clean_url, download=True)
-            video_title = info.get('title', 'download')
-            safe_title = re.sub(r'[\\/*?:"<>|]', "", video_title)[:60]
+            info = ydl.extract_info(clean_url, download=False)
+            stream_url = info.get('url')
+            if stream_url:
+                record_usage()
+                return jsonify({
+                    'success': True,
+                    'download_url': stream_url,
+                    'filename': f"{info.get('title', video_id)}.{download_type}"
+                })
+    except Exception:
+        pass
 
-        target_ext = 'mp3' if download_type == 'mp3' else 'mp4'
-        expected_file = f"{base_filename}.{target_ext}"
-        if not os.path.exists(expected_file):
-            matched = glob.glob(f"{base_filename}.*")
-            if matched: expected_file = matched[0]
-            else: return "파일 생성 실패", 500
-
-        record_usage()
-
-        @after_this_request
-        def cleanup(response):
-            try:
-                if os.path.exists(expected_file): os.remove(expected_file)
-            except: pass
-            return response
-
-        quality_suffix = f"_{height}p" if download_type == 'mp4' and height.isdigit() else ""
-        return send_file(expected_file, as_attachment=True, download_name=f"{safe_title}{quality_suffix}.{target_ext}")
-
-    except Exception as e:
-        return f"다운로드 오류: {str(e)}", 500
+    return jsonify({'error': '현재 유튜브 미디어 변환 서버가 일시 지연 중입니다. 잠시 후 다시 시도해 주세요.'}), 503
 
 @app.route('/api/board', methods=['GET'])
 def get_posts():
