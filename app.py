@@ -12,8 +12,8 @@ import sqlite3
 try:
     import static_ffmpeg
     static_ffmpeg.add_paths()
-except ImportError:
-    pass
+except Exception as e:
+    print(f"Warning: static_ffmpeg skipped: {e}")
 
 app = Flask(__name__)
 app.secret_key = 'cosmic_secret_youtube_admin_key_#987654'
