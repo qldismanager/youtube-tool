@@ -24,20 +24,20 @@ DB_FILE = os.path.join(BASE_DIR, 'service.db')
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# [핵심] 2026년 최신 데이터센터 봇 차단 우회 옵션 (mweb/tv client 세션 풀 활용)
+# 봇 탐지 우회를 위한 표준 옵션
 def get_base_ydl_opts():
     opts = {
         'quiet': True,
         'no_warnings': True,
-        # 유튜브 TV 및 모바일 웹 클라이언트는 데이터센터 IP 차단 검사를 하지 않음
+        'noplaylist': True,  # 재생목록 탐색 원천 차단 (봇 탐지 회피 핵심)
         'extractor_args': {
             'youtube': {
-                'player_client': ['tv', 'mweb', 'android'],
+                'player_client': ['android', 'web'],
                 'player_skip': ['webpage', 'configs'],
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36',
             'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
         }
     }
@@ -143,16 +143,18 @@ def record_usage():
         )
         conn.commit()
 
-def extract_video_id(url):
+# [핵심] 재생목록(&list=...), 타임스탬프 등 불필요한 파라미터 완전 제거 함수
+def extract_clean_video_info(url):
     patterns = [
-        r"(?:v=|\/)([0-9A-Za-z_-]{11}).*",
-        r"youtu\.be\/([0-9A-Za-z_-]{11})",
-        r"embed\/([0-9A-Za-z_-]{11})"
+        r"(?:v=|\/|youtu\.be\/|embed\/)([0-9A-Za-z_-]{11})"
     ]
     for pattern in patterns:
         match = re.search(pattern, url)
-        if match: return match.group(1)
-    return None
+        if match:
+            v_id = match.group(1)
+            # 오직 11자리 비디오 ID만으로 구성된 순수 영상 주소 생성
+            return v_id, f"https://www.youtube.com/watch?v={v_id}"
+    return None, None
 
 def format_time(seconds):
     minutes = int(seconds // 60)
@@ -271,16 +273,11 @@ def admin_delete_user(user_id):
 def get_video_formats():
     data = request.json or {}
     url = data.get('url', '').strip()
-    video_id = extract_video_id(url)
+    video_id, clean_url = extract_clean_video_info(url)
     if not video_id:
         return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
-    clean_url = f"https://www.youtube.com/watch?v={video_id}"
-    ydl_opts = {
-        **get_base_ydl_opts(),
-        'skip_download': True,
-        'noplaylist': True
-    }
+    ydl_opts = get_base_ydl_opts()
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -330,12 +327,14 @@ def get_video_formats():
             return jsonify({
                 'success': True,
                 'title': title,
+                'clean_url': clean_url,
                 'formats': format_list
             })
     except Exception as e:
         return jsonify({
             'success': True,
             'title': 'YouTube 동영상',
+            'clean_url': clean_url,
             'formats': [
                 {'height': 1080, 'label': '1080p (FHD 고화질)', 'size_str': '용량 최적화'},
                 {'height': 720, 'label': '720p (HD 표준)', 'size_str': '용량 최적화'},
@@ -362,10 +361,9 @@ def get_transcript():
     url = data.get('url', '').strip()
     target_lang = data.get('lang', 'en')
 
-    video_id = extract_video_id(url)
+    video_id, clean_url = extract_clean_video_info(url)
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
-    clean_url = f"https://www.youtube.com/watch?v={video_id}"
     ydl_opts = {
         **get_base_ydl_opts(),
         'skip_download': True,
@@ -440,7 +438,7 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [미디어 다운로드 API] -----------------
+# ----------------- [미디어 다운로드 API: 순수 단일 URL 강제] -----------------
 @app.route('/api/download')
 def download_media():
     if 'user_id' in session:
@@ -454,14 +452,14 @@ def download_media():
         if quota['remaining'] != '무제한' and quota['remaining'] <= 0:
             return "오늘 무료 한도를 모두 소진하셨습니다. 회원가입 시 무제한 이용이 가능합니다.", 429
 
-    url = request.args.get('url', '').strip()
+    raw_url = request.args.get('url', '').strip()
     download_type = request.args.get('type', 'mp3')
     height = request.args.get('quality', 'best')
 
-    video_id = extract_video_id(url)
+    # [핵심] 긴 재생목록 파라미터를 완전히 버리고 오직 순수 단일 영상 주소로만 다운로드
+    video_id, clean_url = extract_clean_video_info(raw_url)
     if not video_id: return "유효한 유튜브 URL이 아닙니다.", 400
 
-    clean_url = f"https://www.youtube.com/watch?v={video_id}"
     base_filename = os.path.join(DOWNLOAD_FOLDER, f"{video_id}_{download_type}_{height}")
 
     for f in glob.glob(f"{base_filename}.*"):
@@ -493,6 +491,7 @@ def download_media():
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # 순수한 단일 URL(clean_url)로 다운로드
             info = ydl.extract_info(clean_url, download=True)
             video_title = info.get('title', 'download')
             safe_title = re.sub(r'[\\/*?:"<>|]', "", video_title)[:60]
