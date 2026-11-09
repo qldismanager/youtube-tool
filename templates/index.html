@@ -42,7 +42,7 @@
 
             <div class="flex items-center gap-3">
                 <div id="quota-badge" class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-cyan-950/70 border border-cyan-500/30 text-cyan-300 flex items-center gap-1.5 shadow-inner">
-                    <span id="quota-text">상태 확인 중...</span>
+                    <span id="quota-text">확인 중...</span>
                 </div>
 
                 <div id="auth-buttons">
@@ -67,7 +67,7 @@
                 <span class="bg-gradient-to-r from-blue-200 via-cyan-300 to-indigo-300 bg-clip-text text-transparent">YouTube 스크립트 & 미디어 스튜디오</span>
             </h1>
             <p class="text-slate-400 max-w-xl mx-auto text-sm sm:text-base">
-                회원가입 시 <span class="text-cyan-400 font-bold">무제한 무료</span>로 고품질 대본 추출과 봇 차단 없는 다이렉트 미디어 다운로드를 지원합니다.
+                별도 설정 없이 <span class="text-cyan-400 font-bold">URL 복사만으로</span> 대본 추출 및 무차단 미디어 다운로드를 즉시 이용하세요.
             </p>
         </div>
 
@@ -113,13 +113,13 @@
                     <span>대본 추출하기</span>
                 </button>
 
-                <button onclick="requestActionWithConsent(() => startDirectDownload('mp3'))" id="mp3-btn"
+                <button onclick="requestActionWithConsent(() => startInstantDownload('mp3'))" id="mp3-btn"
                         class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30">
                     <i class="fa-solid fa-headphones"></i>
                     <span>MP3 음원 다운로드</span>
                 </button>
 
-                <button onclick="requestActionWithConsent(() => startDirectDownload('mp4'))" id="mp4-btn"
+                <button onclick="requestActionWithConsent(openQualityModal)" id="mp4-btn"
                         class="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-pink-900/30">
                     <i class="fa-solid fa-film"></i>
                     <span>MP4 영상 다운로드</span>
@@ -191,9 +191,9 @@
                     <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 text-lg">
                         <i class="fa-solid fa-bolt"></i>
                     </div>
-                    <h3 class="font-bold text-base mb-1">봇 차단 없는 고속 다운로드</h3>
+                    <h3 class="font-bold text-base mb-1">광고 없는 다이렉트 다운로드</h3>
                     <p class="text-xs text-slate-400 leading-relaxed">
-                        서버 IP 차단을 완벽히 우회하는 다이렉트 변환 프로토콜을 적용하여 봇 감지 에러 없이 안전하게 내려받습니다.
+                        스팸 및 도박 사이트로 튕기지 않고, 쿠키 설정 없이도 URL만 넣으면 순수 미디어를 즉각 내려받습니다.
                     </p>
                 </div>
 
@@ -240,6 +240,49 @@
     <footer class="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500 cosmic-glass">
         <p>© 2025 COSMIC TUBE. Powered by Deep Universe Studio.</p>
     </footer>
+
+    <!-- 화질 선택 모달 창 -->
+    <div id="quality-modal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center hidden px-4">
+        <div class="cosmic-glass border border-cyan-500/30 p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative">
+            <button onclick="closeQualityModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            
+            <div class="flex items-center gap-2.5 mb-2 text-cyan-400">
+                <i class="fa-solid fa-film text-xl"></i>
+                <h3 class="text-lg font-bold text-slate-100">다운로드 화질 선택</h3>
+            </div>
+            <p id="quality-video-title" class="text-xs text-slate-400 truncate mb-5 pb-3 border-b border-slate-800">원하시는 화질을 선택하세요.</p>
+
+            <div class="space-y-2.5 mb-4">
+                <button onclick="startInstantDownload('mp4', '1080')" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/50 transition text-left group">
+                    <div>
+                        <span class="font-bold text-sm text-slate-200 block">1080p (FHD 초고화질)</span>
+                        <span class="text-[11px] text-slate-400">선명하고 깨끗한 원본 화질</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down text-slate-500 group-hover:text-cyan-400 transition text-xs"></i>
+                </button>
+                <button onclick="startInstantDownload('mp4', '720')" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/50 transition text-left group">
+                    <div>
+                        <span class="font-bold text-sm text-slate-200 block">720p (HD 표준 화질)</span>
+                        <span class="text-[11px] text-slate-400">빠른 다운로드와 적절한 용량</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down text-slate-500 group-hover:text-cyan-400 transition text-xs"></i>
+                </button>
+                <button onclick="startInstantDownload('mp4', '480')" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/50 transition text-left group">
+                    <div>
+                        <span class="font-bold text-sm text-slate-200 block">480p (SD 절약 화질)</span>
+                        <span class="text-[11px] text-slate-400">스마트폰 저장공간 절약용</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-down text-slate-500 group-hover:text-cyan-400 transition text-xs"></i>
+                </button>
+            </div>
+
+            <button onclick="closeQualityModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-xl text-xs transition">
+                취소
+            </button>
+        </div>
+    </div>
 
     <!-- 로그인/회원가입 모달 -->
     <div id="auth-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden px-4">
@@ -317,7 +360,7 @@
         let sponsorUrl = 'https://link.coupang.com/a/idfYJANZHU';
         let pendingAction = null;
 
-        function extractVideoId(url) {
+        function extractCleanVideoId(url) {
             const match = url.match(/(?:v=|\/|youtu\.be\/|embed\/)([0-9A-Za-z_-]{11})/);
             return match ? match[1] : null;
         }
@@ -364,25 +407,92 @@
             }
         }
 
-        // [핵심] Render 서버의 봇 차단을 100% 우회하는 다이렉트 브라우저 다운로드 엔진
-        function startDirectDownload(type) {
-            const urlInput = document.getElementById('url').value.trim();
-            const videoId = extractVideoId(urlInput);
+        // [핵심] 광고 0%, 봇 차단 0% 오픈소스 Cobalt 다이렉트 변환 엔진
+        async function startInstantDownload(type, quality = '1080') {
+            const rawUrl = document.getElementById('url').value.trim();
+            const videoId = extractCleanVideoId(rawUrl);
 
             if (!videoId) {
                 showStatus("올바른 YouTube URL을 입력해 주세요.", true);
                 return;
             }
 
-            showStatus(`봇 차단 없는 고속 다이렉트 엔진으로 ${type.toUpperCase()} 다운로드를 시작합니다...`, false, true);
-            addRecentUrl(`https://www.youtube.com/watch?v=${videoId}`);
+            if (quality !== 'best') closeQualityModal();
+            const cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            addRecentUrl(cleanUrl);
 
-            // 사용자 브라우저의 정상 IP를 활용하는 고성능 글로벌 무료 변환 API 프로토콜
-            const downloadUrl = `https://loader.to/api/button/?url=https://www.youtube.com/watch?v=${videoId}&f=${type}`;
-            
-            // 새 탭을 띄워 광고나 차단 없이 즉각 파일 다운로드 진행
-            window.open(downloadUrl, '_blank', 'width=500,height=300');
-            setTimeout(syncAuthStatus, 2000);
+            showStatus(`고속 다이렉트 엔진으로 ${type.toUpperCase()} 파일을 변환하고 있습니다. 잠시만 기다려주세요...`, false, true);
+
+            // 전 세계 오픈소스 커뮤니티가 유지보수하는 광고 없는 순수 Cobalt API 엔드포인트 목록
+            const cobaltInstances = [
+                'https://api.cobalt.tools/api/json',
+                'https://cobalt.api.kwiatekm.pl/api/json',
+                'https://co.wuk.sh/api/json'
+            ];
+
+            let downloadSuccess = false;
+
+            for (const apiUrl of cobaltInstances) {
+                try {
+                    const payload = {
+                        url: cleanUrl,
+                        vQuality: quality,
+                        filenamePattern: 'basic',
+                        isAudioOnly: (type === 'mp3')
+                    };
+                    if (type === 'mp3') {
+                        payload.aFormat = 'mp3';
+                    }
+
+                    const res = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await res.json();
+
+                    if (data && (data.url || (data.picker && data.picker[0]))) {
+                        const finalFileUrl = data.url || data.picker[0].url;
+                        showStatus("변환 완료! 순수 미디어 파일이 브라우저로 직접 다운로드됩니다.", false);
+                        
+                        // 광고 창 팝업 없이 브라우저 내에서 즉각 파일 저장 트리거
+                        const a = document.createElement('a');
+                        a.href = finalFileUrl;
+                        a.download = `YouTube_${videoId}.${type}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+
+                        downloadSuccess = true;
+                        setTimeout(syncAuthStatus, 2000);
+                        break;
+                    }
+                } catch (e) {
+                    console.warn(`Cobalt 인스턴스(${apiUrl}) 연결 실패, 백업 인스턴스로 자동 전환...`);
+                }
+            }
+
+            if (!downloadSuccess) {
+                showStatus("변환 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.", true);
+            }
+        }
+
+        // ---------------- [화질 선택 모달] ----------------
+        function openQualityModal() {
+            const url = document.getElementById('url').value.trim();
+            if (!url) {
+                showStatus("YouTube URL을 입력해 주세요.", true);
+                return;
+            }
+            document.getElementById('quality-modal').classList.remove('hidden');
+        }
+
+        function closeQualityModal() {
+            document.getElementById('quality-modal').classList.add('hidden');
         }
 
         // ---------------- [최근 URL 히스토리] ----------------
@@ -580,7 +690,7 @@
                 const res = await fetch('/api/transcript', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url, lang })
+                    body: JSON.stringify({ url: url, lang: lang })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || '대본 추출 실패');
