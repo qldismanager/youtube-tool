@@ -1,4 +1,3 @@
-cat << 'EOF' > /home/ubuntu/youtube-tool/app.py
 from flask import Flask, render_template, request, jsonify, send_file, after_this_request, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import date, timedelta
@@ -277,24 +276,23 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [핵심: 어떤 영상이든 100% 성공하는 미디어 다운로드 API] -----------------
+# ----------------- [핵심: 최적 화질 단일 다이렉트 다운로드 API] -----------------
 @app.route('/api/download/execute', methods=['POST'])
 def execute_download():
     data = request.json or {}
     raw_url = data.get('url', '').strip()
     download_type = data.get('type', 'mp3')
-    quality = data.get('quality', '720')
 
     video_id, clean_url = extract_clean_video_info(raw_url)
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
 
-    base_filename = os.path.join(DOWNLOAD_FOLDER, f"{video_id}_{download_type}_{quality}")
+    base_filename = os.path.join(DOWNLOAD_FOLDER, f"{video_id}_{download_type}")
 
     for f in glob.glob(f"{base_filename}.*"):
         try: os.remove(f)
         except: pass
 
-    # [핵심 해결] 쇼츠, 세로영상, 일반영상 어디서든 무조건 성공하는 범용 포맷 체계
+    # 어떤 영상이든 포맷 에러 없이 100% 성공하는 글로벌 표준 포맷
     if download_type == 'mp3':
         extra_opts = {
             'format': 'ba/b',
@@ -302,9 +300,9 @@ def execute_download():
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
         }
     else:
-        # Requested format is not available 완전 해결: 존재하는 포맷 중 최선을 자동 병합
+        # 단일 최적 파일 우선, 없으면 분리형 최고화질 자동 결합
         extra_opts = {
-            'format': f'bv*[height<={quality}]+ba/b[height<={quality}]/bv*+ba/b/best',
+            'format': 'b/bv*+ba/best',
             'outtmpl': f"{base_filename}.%(ext)s",
             'merge_output_format': 'mp4',
             'postprocessor_args': ['-movflags', 'faststart'],
@@ -328,8 +326,7 @@ def execute_download():
         record_usage()
         
         file_id = os.path.basename(expected_file)
-        quality_suffix = f"_{quality}p" if download_type == 'mp4' else ""
-        final_filename = f"{safe_title}{quality_suffix}.{target_ext}"
+        final_filename = f"{safe_title}.{target_ext}"
 
         return jsonify({
             'success': True,
@@ -380,4 +377,3 @@ def board():
 
 if __name__ == '__main__':
     app.run(port=5000)
-EOF

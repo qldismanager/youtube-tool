@@ -32,7 +32,6 @@
 </head>
 <body class="text-slate-100 min-h-screen flex flex-col justify-between">
 
-    <!-- 상단 네비게이션 바 -->
     <header class="sticky top-0 z-40 cosmic-glass border-b border-cyan-500/10">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2.5 font-black text-xl tracking-wider text-cyan-400">
@@ -51,27 +50,23 @@
                 </div>
 
                 <div id="user-profile" class="hidden items-center gap-2">
-                    <a href="/admin" id="admin-link" class="hidden text-xs px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-300 font-bold transition items-center gap-1">
-                        <i class="fa-solid fa-gear"></i> 관리자 센터
-                    </a>
+                    <span id="user-email-display" class="text-xs text-slate-400"></span>
                     <button onclick="logout()" class="text-xs px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 transition">로그아웃</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- 메인 컨텐츠 영역 -->
     <main class="max-w-5xl mx-auto px-4 py-12 w-full flex-grow">
         <div class="text-center mb-10">
             <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-3">
                 <span class="bg-gradient-to-r from-blue-200 via-cyan-300 to-indigo-300 bg-clip-text text-transparent">YouTube 스크립트 & 미디어 스튜디오</span>
             </h1>
             <p class="text-slate-400 max-w-xl mx-auto text-sm sm:text-base">
-                회원가입 시 <span class="text-cyan-400 font-bold">무제한 무료</span>로 고품질 대본 추출과 순수 미디어 직접 다운로드를 지원합니다.
+                회원가입 시 <span class="text-cyan-400 font-bold">무제한 무료</span>로 고품질 대본 추출과 고속 미디어 다운로드를 지원합니다.
             </p>
         </div>
 
-        <!-- 핵심 작업 카드 -->
         <div class="cosmic-glass rounded-3xl p-6 sm:p-8 shadow-2xl mb-8 border border-blue-500/20">
             <label class="block text-xs uppercase tracking-wider font-bold text-cyan-400 mb-3">
                 <i class="fa-solid fa-language mr-1"></i> 1. 추출할 자막 언어 선택 (기본: English)
@@ -119,7 +114,7 @@
                     <span>MP3 음원 다운로드</span>
                 </button>
 
-                <button onclick="requestActionWithConsent(openQualityModal)" id="mp4-btn"
+                <button onclick="requestActionWithConsent(() => startNativeDownload('mp4'))" id="mp4-btn"
                         class="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-pink-900/30">
                     <i class="fa-solid fa-film"></i>
                     <span>MP4 영상 다운로드</span>
@@ -129,7 +124,6 @@
             <p id="status-msg" class="text-sm mt-4 hidden flex items-center gap-2"></p>
         </div>
 
-        <!-- 최근 이용한 링크 목록 -->
         <div class="cosmic-glass rounded-2xl p-5 mb-12 border border-slate-800">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-1.5">
@@ -144,7 +138,6 @@
             </div>
         </div>
 
-        <!-- 대본 결과 박스 -->
         <div id="result-container" class="cosmic-glass rounded-3xl overflow-hidden hidden mb-16 border border-cyan-500/20 shadow-2xl">
             <div class="border-b border-slate-700/60 px-6 py-4 flex flex-wrap items-center justify-between gap-4 bg-slate-900/60">
                 <div class="flex bg-slate-950/80 p-1 rounded-xl border border-slate-800">
@@ -166,125 +159,13 @@
                 <textarea id="transcript-box" readonly class="w-full h-96 p-4 text-slate-200 bg-slate-950/70 border border-slate-800 rounded-2xl font-mono text-sm leading-relaxed resize-none focus:outline-none"></textarea>
             </div>
         </div>
-
-        <!-- 가이드 섹션 -->
-        <section class="mb-16">
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-slate-200 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-compass text-cyan-400"></i> 사이트 이용 가이드 및 회원 혜택
-                </h2>
-                <p class="text-xs text-slate-400 mt-1">Cosmic Tube가 제공하는 강력한 도구들을 확인해보세요.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="cosmic-glass p-6 rounded-2xl border border-blue-500/10">
-                    <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4 text-lg">
-                        <i class="fa-solid fa-infinity"></i>
-                    </div>
-                    <h3 class="font-bold text-base mb-1">회원 무제한 무료</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">
-                        간단한 이메일 가입만으로 일일 횟수 제한 없이 대본 추출과 음원/영상 다운로드를 무제한 이용하실 수 있습니다.
-                    </p>
-                </div>
-
-                <div class="cosmic-glass p-6 rounded-2xl border border-indigo-500/10">
-                    <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-4 text-lg">
-                        <i class="fa-solid fa-bolt"></i>
-                    </div>
-                    <h3 class="font-bold text-base mb-1">순수 직접 다운로드</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">
-                        외부 스팸/도박 사이트로 전혀 나가지 않고, 내 브라우저에서 직접 파일로 깔끔하게 내려받습니다.
-                    </p>
-                </div>
-
-                <div class="cosmic-glass p-6 rounded-2xl border border-cyan-500/10">
-                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-4 text-lg">
-                        <i class="fa-solid fa-language"></i>
-                    </div>
-                    <h3 class="font-bold text-base mb-1">다국어 실시간 번역</h3>
-                    <p class="text-xs text-slate-400 leading-relaxed">
-                        원 영상에 한국어 자막이 없더라도 구글 인공지능 번역 엔진을 통해 자연스러운 한글 대본으로 자동 변환해 드립니다.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <!-- 방명록 섹션 -->
-        <section class="cosmic-glass rounded-3xl p-6 sm:p-8 border border-blue-500/20">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
-                        <i class="fa-solid fa-satellite text-cyan-400"></i> 우주 전파 방명록
-                    </h2>
-                    <p class="text-xs text-slate-400 mt-1">사이트 개선점이나 남기고 싶은 한마디를 자유롭게 남겨보세요.</p>
-                </div>
-                <button onclick="loadBoardPosts()" class="text-xs text-cyan-400 hover:underline flex items-center gap-1">
-                    <i class="fa-solid fa-rotate"></i> 새로고침
-                </button>
-            </div>
-
-            <div class="flex gap-2 mb-6">
-                <input type="text" id="board-content" placeholder="방명록이나 사용 후기를 남겨주세요..." 
-                       class="flex-1 cosmic-input px-4 py-2.5 rounded-xl text-slate-200 text-sm focus:outline-none">
-                <button onclick="submitBoardPost()" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-sm transition">
-                    전송
-                </button>
-            </div>
-
-            <div id="board-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1 text-sm text-slate-300">
-                <p class="text-xs text-slate-500 text-center py-4">방명록을 불러오는 중입니다...</p>
-            </div>
-        </section>
     </main>
 
     <footer class="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500 cosmic-glass">
         <p>© 2025 COSMIC TUBE. Powered by Deep Universe Studio.</p>
     </footer>
 
-    <!-- 화질 선택 모달 창 -->
-    <div id="quality-modal" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center hidden px-4">
-        <div class="cosmic-glass border border-cyan-500/30 p-6 sm:p-8 rounded-3xl max-w-md w-full shadow-2xl relative">
-            <button onclick="closeQualityModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-            
-            <div class="flex items-center gap-2.5 mb-2 text-cyan-400">
-                <i class="fa-solid fa-film text-xl"></i>
-                <h3 class="text-lg font-bold text-slate-100">다운로드 화질 선택</h3>
-            </div>
-            <p id="quality-video-title" class="text-xs text-slate-400 truncate mb-5 pb-3 border-b border-slate-800">원하시는 화질을 선택하세요.</p>
-
-            <div class="space-y-2.5 mb-4">
-                <button onclick="startNativeDownload('mp4', '1080')" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/50 transition text-left group">
-                    <div>
-                        <span class="font-bold text-sm text-slate-200 block">1080p (FHD 고화질)</span>
-                        <span class="text-[11px] text-slate-400">선명하고 깨끗한 원본 화질</span>
-                    </div>
-                    <i class="fa-solid fa-arrow-down text-slate-500 group-hover:text-cyan-400 transition text-xs"></i>
-                </button>
-                <button onclick="startNativeDownload('mp4', '720')" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/50 transition text-left group">
-                    <div>
-                        <span class="font-bold text-sm text-slate-200 block">720p (HD 표준)</span>
-                        <span class="text-[11px] text-slate-400">빠른 다운로드와 적절한 용량</span>
-                    </div>
-                    <i class="fa-solid fa-arrow-down text-slate-500 group-hover:text-cyan-400 transition text-xs"></i>
-                </button>
-                <button onclick="startNativeDownload('mp4', '480')" class="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/60 hover:border-cyan-500/50 transition text-left group">
-                    <div>
-                        <span class="font-bold text-sm text-slate-200 block">480p (SD 절약)</span>
-                        <span class="text-[11px] text-slate-400">저장공간 절약용</span>
-                    </div>
-                    <i class="fa-solid fa-arrow-down text-slate-500 group-hover:text-cyan-400 transition text-xs"></i>
-                </button>
-            </div>
-
-            <button onclick="closeQualityModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-xl text-xs transition">
-                취소
-            </button>
-        </div>
-    </div>
-
-    <!-- 로그인/회원가입 모달 -->
+    <!-- 로그인 모달 -->
     <div id="auth-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden px-4">
         <div class="cosmic-glass border border-cyan-500/30 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl relative">
             <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
@@ -311,7 +192,7 @@
         </div>
     </div>
 
-    <!-- 1일 1회 법적 책임 및 제휴 팝업 동의 모달 -->
+    <!-- 1일 1회 법적 고지 모달 -->
     <div id="consent-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden px-4">
         <div class="cosmic-glass border border-blue-400/40 p-6 sm:p-8 rounded-3xl max-w-lg w-full shadow-2xl relative">
             <div class="flex items-center gap-3 mb-4 text-cyan-400">
@@ -324,16 +205,13 @@
                 <div>
                     <h4 class="font-bold text-slate-100">1. 저작권 및 법적 책임의 귀속</h4>
                     <p class="text-slate-400 mt-0.5">
-                        모든 영상 및 대본의 저작권은 원저작자에게 있습니다. 추출된 대본이나 다운로드한 미디어(MP3/MP4)를 무단 재배포, 상업적 이용, 공공 전송하여 발생하는 **모든 민·형사상 법적 책임은 전적으로 다운로드 및 사용을 실행한 사용자 본인**에게 있습니다. 서비스 제공자는 이에 대한 책임을 지지 않습니다.
+                        모든 영상 및 대본의 저작권은 원저작자에게 있습니다. 추출된 대본이나 다운로드한 미디어(MP3/MP4)를 무단 재배포, 상업적 이용, 공공 전송하여 발생하는 모든 법적 책임은 전적으로 사용자 본인에게 있습니다.
                     </p>
                 </div>
                 <div>
                     <h4 class="font-bold text-slate-100">2. 무료 서버 운영을 위한 스폰서 팝업 안내</h4>
                     <p class="text-slate-400 mt-0.5">
-                        본 서비스는 사용자에게 비용을 청구하지 않는 대신, **하루 1회 쿠팡 파트너스 추천 상품 팝업창**을 오픈하여 서버 유지비를 충당하고 있습니다. 동의 버튼을 클릭하시면 제휴 상품 팝업이 별도 창으로 오픈된 후 서비스가 실행됩니다.
-                    </p>
-                    <p class="text-[11px] text-slate-500 mt-1 italic">
-                        * "쿠팡 파트너스 활동의 일환으로 이에 따른 일정액의 수수료를 제공받을 수 있으며, 이용자에게 추가 비용은 전혀 발생하지 않습니다."
+                        본 서비스는 사용자에게 비용을 청구하지 않는 대신, 하루 1회 쿠팡 추천 상품 팝업창을 오픈하여 서버 유지비를 충당하고 있습니다.
                     </p>
                 </div>
             </div>
@@ -352,7 +230,6 @@
         </div>
     </div>
 
-    <!-- 스크립트 -->
     <script>
         let currentData = { plain_text: '', timestamp_text: '' };
         let activeTab = 'plain';
@@ -386,7 +263,7 @@
         function confirmDailyConsent() {
             const checkbox = document.getElementById('consent-check');
             if (!checkbox.checked) {
-                alert('서비스를 이용하시려면 저작권 책임 및 제휴 팝업 오픈에 동의하셔야 합니다.');
+                alert('동의하셔야 서비스를 이용하실 수 있습니다.');
                 return;
             }
 
@@ -402,16 +279,15 @@
             }
         }
 
-        // [핵심] 완전 자립형 미디어 다운로드 실행 (외부 광고 0%, 순수 파일 직접 다운로드)
-        async function startNativeDownload(type, quality = '720') {
+        // [핵심] 최적 화질 단일 다이렉트 다운로드 실행
+        async function startNativeDownload(type) {
             const urlInput = document.getElementById('url').value.trim();
             if (!urlInput) {
                 showStatus("YouTube URL을 입력해 주세요.", true);
                 return;
             }
 
-            if (quality !== 'best') closeQualityModal();
-            showStatus(`${type.toUpperCase()} 미디어를 변환 및 생성 중입니다. 영상 길이에 따라 잠시만 기다려 주세요...`, false, true);
+            showStatus(`${type.toUpperCase()} 최적 미디어를 변환 및 생성 중입니다. 잠시만 기다려 주세요...`, false, true);
             addRecentUrl(urlInput);
 
             try {
@@ -420,17 +296,14 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         url: urlInput,
-                        type: type,
-                        quality: quality
+                        type: type
                     })
                 });
 
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || '다운로드 준비 실패');
 
-                showStatus("변환 완료! 브라우저 다운로드가 시작됩니다.", false);
-
-                // 생성된 파일을 브라우저로 직접 내려받기
+                showStatus("변환 완료! 파일 다운로드가 시작됩니다.", false);
                 window.location.href = `/api/download/file/${data.file_id}?name=${encodeURIComponent(data.download_name)}`;
                 setTimeout(syncAuthStatus, 2500);
 
@@ -439,20 +312,6 @@
             }
         }
 
-        function openQualityModal() {
-            const url = document.getElementById('url').value.trim();
-            if (!url) {
-                showStatus("YouTube URL을 입력해 주세요.", true);
-                return;
-            }
-            document.getElementById('quality-modal').classList.remove('hidden');
-        }
-
-        function closeQualityModal() {
-            document.getElementById('quality-modal').classList.add('hidden');
-        }
-
-        // ---------------- [최근 URL 히스토리] ----------------
         function addRecentUrl(url, title = '') {
             if (!url) return;
             let list = JSON.parse(localStorage.getItem('cosmic_recent_urls') || '[]');
@@ -466,22 +325,16 @@
         function renderRecentUrls() {
             const listEl = document.getElementById('recent-url-list');
             const list = JSON.parse(localStorage.getItem('cosmic_recent_urls') || '[]');
-
             if (!list.length) {
                 listEl.innerHTML = `<p class="text-xs text-slate-500 py-2">최근 작업 기록이 없습니다.</p>`;
                 return;
             }
-
             listEl.innerHTML = list.map(item => `
                 <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs gap-2">
                     <span class="truncate text-slate-300 font-mono flex-1 text-[11px]" title="${item.url}">${item.title}</span>
                     <div class="flex items-center gap-1.5 shrink-0">
-                        <button onclick="loadUrlIntoInput('${item.url}')" class="px-2 py-1 rounded bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[10px] font-bold transition">
-                            불러오기
-                        </button>
-                        <button onclick="copySpecificUrl('${item.url}', this)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition">
-                            복사
-                        </button>
+                        <button onclick="loadUrlIntoInput('${item.url}')" class="px-2 py-1 rounded bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[10px] font-bold transition">불러오기</button>
+                        <button onclick="copySpecificUrl('${item.url}', this)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition">복사</button>
                     </div>
                 </div>
             `).join('');
@@ -507,7 +360,6 @@
             }
         }
 
-        // ---------------- [상태 동기화] ----------------
         async function syncAuthStatus() {
             try {
                 const res = await fetch('/api/auth/status');
@@ -517,26 +369,17 @@
                 const badgeText = document.getElementById('quota-text');
                 const authBtns = document.getElementById('auth-buttons');
                 const userProfile = document.getElementById('user-profile');
-                const adminLink = document.getElementById('admin-link');
 
                 if (data.is_logged_in) {
-                    badgeText.innerHTML = `<span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[8px] animate-pulse"></i> ${data.email} (회원: 무제한 이용 중)</span>`;
+                    badgeText.innerHTML = `<span class="text-emerald-400 font-bold flex items-center gap-1"><i class="fa-solid fa-circle text-[8px] animate-pulse"></i> ${data.email} (무제한)</span>`;
                     authBtns.classList.add('hidden');
                     userProfile.classList.remove('hidden');
                     userProfile.classList.add('flex');
-
-                    if (data.is_admin) {
-                        adminLink.classList.remove('hidden');
-                        adminLink.classList.add('inline-flex');
-                    } else {
-                        adminLink.classList.add('hidden');
-                    }
                 } else {
-                    badgeText.innerHTML = `<span class="text-amber-300 font-medium">게스트 모드: 오늘 남은 횟수 ${data.remaining} / ${data.max}회</span>`;
+                    badgeText.innerHTML = `<span class="text-amber-300 font-medium">게스트: ${data.remaining} / ${data.max}회</span>`;
                     authBtns.classList.remove('hidden');
                     userProfile.classList.add('hidden');
                     userProfile.classList.remove('flex');
-                    adminLink.classList.add('hidden');
                 }
             } catch (e) {
                 console.error(e);
@@ -647,7 +490,7 @@
                 const res = await fetch('/api/transcript', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url, lang })
+                    body: JSON.stringify({ url: url, lang: lang })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || '대본 추출 실패');
@@ -676,48 +519,9 @@
             });
         }
 
-        async function loadBoardPosts() {
-            const listEl = document.getElementById('board-list');
-            try {
-                const res = await fetch('/api/board');
-                const posts = await res.json();
-                if (!posts.length) {
-                    listEl.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">첫 번째 방명록 글을 남겨보세요!</p>`;
-                    return;
-                }
-                listEl.innerHTML = posts.map(p => `
-                    <div class="p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-start justify-between gap-3">
-                        <div>
-                            <span class="text-xs font-bold text-cyan-400">${p.author.split('@')[0]}</span>
-                            <p class="text-xs text-slate-200 mt-0.5">${p.content}</p>
-                        </div>
-                        <span class="text-[10px] text-slate-500 whitespace-nowrap">${p.created_at.split(' ')[0]}</span>
-                    </div>
-                `).join('');
-            } catch (e) {
-                listEl.innerHTML = `<p class="text-xs text-rose-400 text-center py-4">게시판 로드 실패</p>`;
-            }
-        }
-
-        async function submitBoardPost() {
-            const content = document.getElementById('board-content').value.trim();
-            if (!content) return;
-
-            const res = await fetch('/api/board', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ content })
-            });
-            if (res.ok) {
-                document.getElementById('board-content').value = '';
-                loadBoardPosts();
-            }
-        }
-
         window.onload = () => {
             syncAuthStatus();
             renderRecentUrls();
-            loadBoardPosts();
         };
     </script>
 </body>
