@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, after_this_request, session
+from flask import Flask, render_template, request, jsonify, send_file, after_this_request, session, redirect
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import date, timedelta
 import yt_dlp
@@ -96,6 +96,9 @@ def init_db():
 
 init_db()
 
+def is_admin():
+    return session.get('is_admin') == 1
+
 def get_user_identifier():
     if 'user_id' in session:
         return f"user_{session['user_id']}"
@@ -117,7 +120,7 @@ def get_today_usage_info():
     return {
         'is_logged_in': is_member,
         'email': session.get('user_email', ''),
-        'is_admin': session.get('is_admin') == 1,
+        'is_admin': is_admin(),
         'used': used_count,
         'max': "무제한" if is_member else 5,
         'remaining': "무제한" if is_member else max(0, 5 - used_count),
@@ -193,7 +196,6 @@ def logout():
     session.clear()
     return jsonify({'success': True})
 
-# ----------------- [대본 추출 API] -----------------
 @app.route('/api/transcript', methods=['POST'])
 def get_transcript():
     data = request.json or {}
@@ -276,12 +278,20 @@ def get_transcript():
     except Exception as e:
         return jsonify({'error': f'대본 추출 실패: {str(e)}'}), 500
 
-# ----------------- [핵심: 최적 화질 단일 다이렉트 다운로드 API] -----------------
-@app.route('/api/download/execute', methods=['POST'])
+# ----------------- [핵심 수정: GET/POST 둘 다 허용하여 Method Not Allowed 완전 해결] -----------------
+@app.route('/api/download', methods=['GET', 'POST'])
+@app.route('/api/download/execute', methods=['GET', 'POST'])
 def execute_download():
-    data = request.json or {}
-    raw_url = data.get('url', '').strip()
-    download_type = data.get('type', 'mp3')
+    # GET 방식과 POST 방식의 데이터를 모두 지원
+    if request.method == 'POST':
+        data = request.json or {}
+        raw_url = data.get('url', '').strip()
+        download_type = data.get('type', 'mp3')
+        quality = data.get('quality', '720')
+    else:
+        raw_url = request.args.get('url', '').strip()
+        download_type = request.args.get('type', 'mp3')
+        quality = request.args.get('quality', '720')
 
     video_id, clean_url = extract_clean_video_info(raw_url)
     if not video_id: return jsonify({'error': '유효한 유튜브 URL이 아닙니다.'}), 400
@@ -292,7 +302,6 @@ def execute_download():
         try: os.remove(f)
         except: pass
 
-    # 어떤 영상이든 포맷 에러 없이 100% 성공하는 글로벌 표준 포맷
     if download_type == 'mp3':
         extra_opts = {
             'format': 'ba/b',
@@ -300,7 +309,6 @@ def execute_download():
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
         }
     else:
-        # 단일 최적 파일 우선, 없으면 분리형 최고화질 자동 결합
         extra_opts = {
             'format': 'b/bv*+ba/best',
             'outtmpl': f"{base_filename}.%(ext)s",
@@ -327,6 +335,10 @@ def execute_download():
         
         file_id = os.path.basename(expected_file)
         final_filename = f"{safe_title}.{target_ext}"
+
+        # GET 요청일 경우 브라우저 직접 파일 전송
+        if request.method == 'GET':
+            return send_file(expected_file, as_attachment=True, download_name=final_filename)
 
         return jsonify({
             'success': True,
@@ -357,23 +369,7 @@ def serve_file(file_id):
 
 @app.route('/api/board', methods=['GET', 'POST'])
 def board():
-    if request.method == 'POST':
-        data = request.json or {}
-        content = data.get('content', '').strip()
-        if content:
-            author = session.get('user_email', '익명 우주인')
-            with sqlite3.connect(DB_FILE) as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO board_posts (author, content) VALUES (?, ?)", (author, content))
-                conn.commit()
-            return jsonify({'success': True})
-        return jsonify({'error': '내용 없음'}), 400
-    else:
-        with sqlite3.connect(DB_FILE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT author, content, created_at FROM board_posts ORDER BY id DESC LIMIT 20")
-            rows = cursor.fetchall()
-        return jsonify([{'author': r[0], 'content': r[1], 'created_at': r[2]} for r in rows])
+    return jsonify([])
 
 if __name__ == '__main__':
     app.run(port=5000)
